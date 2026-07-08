@@ -171,7 +171,7 @@ export class MeshManager {
         } else if (msg.t === "file-end") {
           const f = bundle.pendingFiles.get(msg.id);
           if (f) {
-            const blob = new Blob(f.chunks);
+            const blob = new Blob(f.chunks as BlobPart[]);
             this.events.onFile(remoteId, f.name, blob);
             bundle.pendingFiles.delete(msg.id);
           }
