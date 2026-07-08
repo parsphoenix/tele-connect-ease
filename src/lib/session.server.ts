@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { getWebRequest, getHeaders, setHeader } from "@tanstack/react-start/server";
+import { getCookie, setCookie } from "@tanstack/react-start/server";
 import { query } from "./db.server";
 
 const COOKIE_NAME = "parstalk_session";
@@ -9,37 +9,26 @@ export function generateToken(): string {
   return crypto.randomBytes(48).toString("hex");
 }
 
-function parseCookie(header: string | null | undefined, name: string): string | null {
-  if (!header) return null;
-  for (const part of header.split(";")) {
-    const [k, ...rest] = part.trim().split("=");
-    if (k === name) return decodeURIComponent(rest.join("="));
-  }
-  return null;
-}
-
 export function getSessionTokenFromRequest(): string | null {
   try {
-    const req = getWebRequest();
-    if (req) return parseCookie(req.headers.get("cookie"), COOKIE_NAME);
-  } catch {}
-  try {
-    const headers = getHeaders() as Record<string, string | undefined>;
-    return parseCookie(headers.cookie, COOKIE_NAME);
-  } catch {}
-  return null;
+    return getCookie(COOKIE_NAME) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function setSessionCookie(token: string) {
-  const maxAge = SESSION_DAYS * 24 * 60 * 60;
-  const cookie = `${COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${
-    process.env.NODE_ENV === "production" ? "; Secure" : ""
-  }`;
-  setHeader("set-cookie", cookie);
+  setCookie(COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_DAYS * 24 * 60 * 60,
+  });
 }
 
 export function clearSessionCookie() {
-  setHeader("set-cookie", `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`);
+  setCookie(COOKIE_NAME, "", { path: "/", maxAge: 0, httpOnly: true, sameSite: "lax" });
 }
 
 export async function createSession(userId: number): Promise<string> {
@@ -66,7 +55,6 @@ export async function getSessionUser(): Promise<{
     [token],
   );
   if (!rows[0]) return null;
-  // sliding session: update last_seen
   await query("UPDATE users SET last_seen = NOW() WHERE id = ?", [rows[0].id]);
   return { id: rows[0].id, username: rows[0].username };
 }
