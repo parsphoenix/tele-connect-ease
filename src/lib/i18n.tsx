@@ -150,6 +150,8 @@ const translations = {
     display_name: "Display name",
     hero_title: "Iran's native communication platform",
     hero_sub: "Voice, video and chat with fully client-side processing. No international internet required.",
+    theme_dark: "Dark",
+    theme_light: "Light",
   },
 } as const;
 
