@@ -15,6 +15,7 @@ export const Route = createFileRoute("/_authenticated")({
 
 function AuthedLayout() {
   const { t, lang, setLang, dir } = useI18n();
+  const { theme, toggle: toggleTheme } = useTheme();
   const meFn = useServerFn(me);
   const logoutFn = useServerFn(logout);
   const router = useRouter();
