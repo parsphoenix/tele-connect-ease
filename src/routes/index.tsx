@@ -31,6 +31,7 @@ function useCaptcha() {
 
 function LandingPage() {
   const { t, lang, setLang, dir } = useI18n();
+  const { theme, toggle: toggleTheme } = useTheme();
   const navigate = useNavigate();
   const router = useRouter();
   const meFn = useServerFn(me);
