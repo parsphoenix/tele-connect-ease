@@ -91,6 +91,15 @@ function AuthedLayout() {
           >
             <Globe className="h-4 w-4" /> {lang === "fa" ? "English" : "فارسی"}
           </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={toggleTheme}
+            className="w-full justify-start gap-2"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === "dark" ? t("theme_light") : t("theme_dark")}
+          </Button>
           <Button variant="ghost" size="sm" onClick={onLogout} className="w-full justify-start gap-2 text-destructive">
             <LogOut className="h-4 w-4" /> {t("logout")}
           </Button>
