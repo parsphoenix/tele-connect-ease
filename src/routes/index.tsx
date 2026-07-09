@@ -86,13 +86,26 @@ function LandingPage() {
             </div>
             <span className="text-lg font-black tracking-tight">{t("app_name")}</span>
           </div>
-          <button
-            onClick={() => setLang(lang === "fa" ? "en" : "fa")}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-secondary"
-          >
-            <Globe className="h-4 w-4" />
-            {lang === "fa" ? "EN" : "FA"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              aria-label="toggle theme"
+              title={theme === "dark" ? t("theme_light") : t("theme_dark")}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-secondary"
+            >
+              {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              <span className="hidden sm:inline">
+                {theme === "dark" ? t("theme_light") : t("theme_dark")}
+              </span>
+            </button>
+            <button
+              onClick={() => setLang(lang === "fa" ? "en" : "fa")}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-secondary"
+            >
+              <Globe className="h-4 w-4" />
+              {lang === "fa" ? "EN" : "FA"}
+            </button>
+          </div>
         </div>
       </header>
 
