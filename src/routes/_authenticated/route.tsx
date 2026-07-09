@@ -3,7 +3,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
 import { me, logout } from "@/lib/auth.functions";
 import { useI18n } from "@/lib/i18n";
-import { LayoutDashboard, Users, Settings, LogOut, Globe, Video } from "lucide-react";
+import { useTheme } from "@/lib/theme";
+import { LayoutDashboard, Users, Settings, LogOut, Globe, Video, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
