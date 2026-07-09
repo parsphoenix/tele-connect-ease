@@ -4,11 +4,12 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { loginOrRegister, me } from "@/lib/auth.functions";
 import { useI18n } from "@/lib/i18n";
+import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { Mic, Video, MessageCircle, ShieldCheck, Globe } from "lucide-react";
+import { Mic, Video, MessageCircle, ShieldCheck, Globe, Sun, Moon } from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
