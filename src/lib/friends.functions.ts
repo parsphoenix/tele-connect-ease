@@ -27,7 +27,7 @@ export const listFriends = createServerFn({ method: "GET" }).handler(async () =>
 });
 
 export const addFriend = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ username: z.string().trim().min(3) }).parse(d))
+  .validator((d: unknown) => z.object({ username: z.string().trim().min(3) }).parse(d))
   .handler(async ({ data }) => {
     const user = await requireUser();
     const target = await query<{ id: number }>("SELECT id FROM users WHERE username = ?", [
@@ -43,7 +43,7 @@ export const addFriend = createServerFn({ method: "POST" })
   });
 
 export const acceptFriend = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ friendId: z.number().int() }).parse(d))
+  .validator((d: unknown) => z.object({ friendId: z.number().int() }).parse(d))
   .handler(async ({ data }) => {
     const user = await requireUser();
     await query(
@@ -54,7 +54,7 @@ export const acceptFriend = createServerFn({ method: "POST" })
   });
 
 export const removeFriend = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ friendId: z.number().int() }).parse(d))
+  .validator((d: unknown) => z.object({ friendId: z.number().int() }).parse(d))
   .handler(async ({ data }) => {
     const user = await requireUser();
     await query(

@@ -22,7 +22,7 @@ const authSchema = z.object({
 });
 
 export const loginOrRegister = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => authSchema.parse(d))
+  .validator((d: unknown) => authSchema.parse(d))
   .handler(async ({ data }) => {
     if (data.captchaAnswer !== data.captchaExpected) {
       throw new Error("CAPTCHA_INVALID");
