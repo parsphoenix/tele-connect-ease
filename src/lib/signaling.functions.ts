@@ -8,7 +8,7 @@ import { query } from "./db.server";
 import { requireUser } from "./session.server";
 
 export const sendSignal = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         roomCode: z.string(),
@@ -27,7 +27,7 @@ export const sendSignal = createServerFn({ method: "POST" })
   });
 
 export const pollSignals = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ roomCode: z.string(), sinceId: z.number().int().default(0) }).parse(d),
   )
   .handler(async ({ data }) => {
@@ -55,7 +55,7 @@ export const pollSignals = createServerFn({ method: "POST" })
   });
 
 export const listActiveUsers = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ roomCode: z.string() }).parse(d))
+  .validator((d: unknown) => z.object({ roomCode: z.string() }).parse(d))
   .handler(async ({ data }) => {
     await requireUser();
     const rows = await query<{ user_id: number; username: string }>(

@@ -41,9 +41,43 @@
   --font-sans: "Vazirmatn", "Inter", system-ui, sans-serif;
 }
 
-/* FACEIT-inspired dark theme with Persian typography */
+/* FACEIT-inspired themes with Persian typography.
+   Dark is default (SSR renders <html class="dark">). Light overrides in :root. */
 :root {
   --radius: 0.5rem;
+  /* Light theme (default when no .dark class) */
+  --background: oklch(0.985 0.003 260);
+  --foreground: oklch(0.2 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.01 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.01 260);
+  --primary: oklch(0.68 0.2 40);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.94 0.005 260);
+  --secondary-foreground: oklch(0.2 0.01 260);
+  --muted: oklch(0.94 0.005 260);
+  --muted-foreground: oklch(0.5 0.01 260);
+  --accent: oklch(0.68 0.2 40);
+  --accent-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.6 0.24 28);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.62 0.18 145);
+  --warning: oklch(0.7 0.16 85);
+  --border: oklch(0.9 0.005 260);
+  --input: oklch(0.94 0.005 260);
+  --ring: oklch(0.68 0.2 40);
+  --sidebar: oklch(0.97 0.004 260);
+  --sidebar-foreground: oklch(0.28 0.01 260);
+  --sidebar-primary: oklch(0.68 0.2 40);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-accent: oklch(0.93 0.005 260);
+  --sidebar-accent-foreground: oklch(0.2 0.01 260);
+  --sidebar-border: oklch(0.9 0.005 260);
+  --sidebar-ring: oklch(0.68 0.2 40);
+}
+
+.dark {
   --background: oklch(0.17 0.005 260);
   --foreground: oklch(0.98 0 0);
   --card: oklch(0.22 0.007 260);
@@ -79,8 +113,11 @@
   * {
     border-color: var(--color-border);
   }
-  html {
+  html.dark {
     color-scheme: dark;
+  }
+  html:not(.dark) {
+    color-scheme: light;
   }
   body {
     background-color: var(--color-background);
@@ -97,5 +134,10 @@
   box-shadow: 0 0 24px -6px var(--primary);
 }
 @utility bg-panel {
-  background: linear-gradient(180deg, oklch(0.24 0.007 260) 0%, oklch(0.2 0.007 260) 100%);
+  background-color: var(--card);
+  background-image: linear-gradient(180deg, color-mix(in oklab, var(--card) 92%, white 8%) 0%, var(--card) 100%);
+}
+.dark .bg-panel,
+.dark [class~="bg-panel"] {
+  background-image: linear-gradient(180deg, oklch(0.24 0.007 260) 0%, oklch(0.2 0.007 260) 100%);
 }

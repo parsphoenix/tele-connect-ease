@@ -75,6 +75,8 @@ const translations = {
     display_name: "نام نمایشی",
     hero_title: "پلتفرم ارتباطی بومی ایران",
     hero_sub: "تماس صوتی و تصویری و چت با پردازش کامل سمت کاربر، بدون نیاز به اینترنت بین‌الملل.",
+    theme_dark: "تم تیره",
+    theme_light: "تم روشن",
   },
   en: {
     app_name: "ParsTalk",
@@ -148,6 +150,8 @@ const translations = {
     display_name: "Display name",
     hero_title: "Iran's native communication platform",
     hero_sub: "Voice, video and chat with fully client-side processing. No international internet required.",
+    theme_dark: "Dark",
+    theme_light: "Light",
   },
 } as const;
 

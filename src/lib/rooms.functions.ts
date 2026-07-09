@@ -30,7 +30,7 @@ export const listPublicRooms = createServerFn({ method: "GET" }).handler(async (
 });
 
 export const createRoom = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         name: z.string().trim().min(2).max(64),
@@ -50,7 +50,7 @@ export const createRoom = createServerFn({ method: "POST" })
   });
 
 export const getRoom = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => z.object({ code: z.string().min(3).max(16) }).parse(d))
+  .validator((d: unknown) => z.object({ code: z.string().min(3).max(16) }).parse(d))
   .handler(async ({ data }) => {
     await requireUser();
     const rows = await query<{
@@ -68,7 +68,7 @@ export const getRoom = createServerFn({ method: "GET" })
   });
 
 export const joinRoom = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ code: z.string() }).parse(d))
+  .validator((d: unknown) => z.object({ code: z.string() }).parse(d))
   .handler(async ({ data }) => {
     const user = await requireUser();
     const rows = await query<{ id: number; max_users: number }>(
@@ -95,7 +95,7 @@ export const joinRoom = createServerFn({ method: "POST" })
   });
 
 export const leaveRoom = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => z.object({ code: z.string() }).parse(d))
+  .validator((d: unknown) => z.object({ code: z.string() }).parse(d))
   .handler(async ({ data }) => {
     const user = await requireUser();
     const rows = await query<{ id: number }>("SELECT id FROM rooms WHERE code = ? LIMIT 1", [
@@ -116,7 +116,7 @@ export const leaveRoom = createServerFn({ method: "POST" })
   });
 
 export const listRoomMembers = createServerFn({ method: "GET" })
-  .inputValidator((d: unknown) => z.object({ code: z.string() }).parse(d))
+  .validator((d: unknown) => z.object({ code: z.string() }).parse(d))
   .handler(async ({ data }) => {
     await requireUser();
     const rows = await query<{ id: number; username: string; joined_at: Date }>(
