@@ -24,8 +24,9 @@ export interface PeerEvents {
   onRemoteStream: (userId: number, stream: MediaStream) => void;
   onPeerLeft: (userId: number) => void;
   onChatMessage: (userId: number, message: string) => void;
-  onFile: (userId: number, name: string, blob: Blob) => void;
+  onFile: (userId: number, name: string, mime: string, blob: Blob) => void;
   onStatus: (userId: number, state: string) => void;
+  onControl?: (userId: number, msg: Record<string, unknown>) => void;
 }
 
 interface PeerBundle {
