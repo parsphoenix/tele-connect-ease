@@ -162,9 +162,11 @@ export class MeshManager {
       try {
         const msg = JSON.parse(data);
         if (msg.t === "chat") this.events.onChatMessage(remoteId, msg.text);
+        else if (msg.t === "ctrl") this.events.onControl?.(remoteId, msg.data);
         else if (msg.t === "file-start") {
           bundle.pendingFiles.set(msg.id, {
             name: msg.name,
+            mime: msg.mime ?? "application/octet-stream",
             chunks: [],
             size: msg.size,
             received: 0,
@@ -172,8 +174,8 @@ export class MeshManager {
         } else if (msg.t === "file-end") {
           const f = bundle.pendingFiles.get(msg.id);
           if (f) {
-            const blob = new Blob(f.chunks as BlobPart[]);
-            this.events.onFile(remoteId, f.name, blob);
+            const blob = new Blob(f.chunks as BlobPart[], { type: f.mime });
+            this.events.onFile(remoteId, f.name, f.mime, blob);
             bundle.pendingFiles.delete(msg.id);
           }
         }
