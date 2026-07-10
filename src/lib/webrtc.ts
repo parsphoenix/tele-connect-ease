@@ -325,11 +325,35 @@ export class MeshManager {
     }
   }
 
+  /** Broadcast a control message on all data channels */
+  sendControl(data: Record<string, unknown>, onlyTo?: number) {
+    const msg = JSON.stringify({ t: "ctrl", data });
+    for (const [id, b] of this.peers) {
+      if (onlyTo && id !== onlyTo) continue;
+      if (b.dc?.readyState === "open") b.dc.send(msg);
+    }
+  }
+
+  /** Get round-trip time in ms to a specific peer (0 if unknown) */
+  async getPeerPing(id: number): Promise<number> {
+    const b = this.peers.get(id);
+    if (!b) return 0;
+    try {
+      const stats = await b.pc.getStats();
+      for (const rep of stats.values()) {
+        if (rep.type === "candidate-pair" && rep.state === "succeeded" && typeof rep.currentRoundTripTime === "number") {
+          return Math.round(rep.currentRoundTripTime * 1000);
+        }
+      }
+    } catch {}
+    return 0;
+  }
+
   async sendFile(file: File) {
     const id = crypto.randomUUID();
     const chunkSize = 16 * 1024;
     const idBytes = new TextEncoder().encode(id);
-    const header = JSON.stringify({ t: "file-start", id, name: file.name, size: file.size });
+    const header = JSON.stringify({ t: "file-start", id, name: file.name, mime: file.type || "application/octet-stream", size: file.size });
     const footer = JSON.stringify({ t: "file-end", id });
     for (const [, b] of this.peers) {
       if (b.dc?.readyState === "open") b.dc.send(header);
