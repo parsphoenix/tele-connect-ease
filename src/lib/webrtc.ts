@@ -35,7 +35,7 @@ interface PeerBundle {
   makingOffer: boolean;
   polite: boolean;
   ignoreOffer: boolean;
-  pendingFiles: Map<string, { name: string; chunks: Uint8Array[]; size: number; received: number }>;
+  pendingFiles: Map<string, { name: string; mime: string; chunks: Uint8Array[]; size: number; received: number }>;
 }
 
 export class MeshManager {
