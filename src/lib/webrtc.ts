@@ -24,8 +24,9 @@ export interface PeerEvents {
   onRemoteStream: (userId: number, stream: MediaStream) => void;
   onPeerLeft: (userId: number) => void;
   onChatMessage: (userId: number, message: string) => void;
-  onFile: (userId: number, name: string, blob: Blob) => void;
+  onFile: (userId: number, name: string, mime: string, blob: Blob) => void;
   onStatus: (userId: number, state: string) => void;
+  onControl?: (userId: number, msg: Record<string, unknown>) => void;
 }
 
 interface PeerBundle {
@@ -34,7 +35,7 @@ interface PeerBundle {
   makingOffer: boolean;
   polite: boolean;
   ignoreOffer: boolean;
-  pendingFiles: Map<string, { name: string; chunks: Uint8Array[]; size: number; received: number }>;
+  pendingFiles: Map<string, { name: string; mime: string; chunks: Uint8Array[]; size: number; received: number }>;
 }
 
 export class MeshManager {
@@ -161,9 +162,11 @@ export class MeshManager {
       try {
         const msg = JSON.parse(data);
         if (msg.t === "chat") this.events.onChatMessage(remoteId, msg.text);
+        else if (msg.t === "ctrl") this.events.onControl?.(remoteId, msg.data);
         else if (msg.t === "file-start") {
           bundle.pendingFiles.set(msg.id, {
             name: msg.name,
+            mime: msg.mime ?? "application/octet-stream",
             chunks: [],
             size: msg.size,
             received: 0,
@@ -171,8 +174,8 @@ export class MeshManager {
         } else if (msg.t === "file-end") {
           const f = bundle.pendingFiles.get(msg.id);
           if (f) {
-            const blob = new Blob(f.chunks as BlobPart[]);
-            this.events.onFile(remoteId, f.name, blob);
+            const blob = new Blob(f.chunks as BlobPart[], { type: f.mime });
+            this.events.onFile(remoteId, f.name, f.mime, blob);
             bundle.pendingFiles.delete(msg.id);
           }
         }
@@ -322,11 +325,35 @@ export class MeshManager {
     }
   }
 
+  /** Broadcast a control message on all data channels */
+  sendControl(data: Record<string, unknown>, onlyTo?: number) {
+    const msg = JSON.stringify({ t: "ctrl", data });
+    for (const [id, b] of this.peers) {
+      if (onlyTo && id !== onlyTo) continue;
+      if (b.dc?.readyState === "open") b.dc.send(msg);
+    }
+  }
+
+  /** Get round-trip time in ms to a specific peer (0 if unknown) */
+  async getPeerPing(id: number): Promise<number> {
+    const b = this.peers.get(id);
+    if (!b) return 0;
+    try {
+      const stats = await b.pc.getStats();
+      for (const rep of stats.values()) {
+        if (rep.type === "candidate-pair" && rep.state === "succeeded" && typeof rep.currentRoundTripTime === "number") {
+          return Math.round(rep.currentRoundTripTime * 1000);
+        }
+      }
+    } catch {}
+    return 0;
+  }
+
   async sendFile(file: File) {
     const id = crypto.randomUUID();
     const chunkSize = 16 * 1024;
     const idBytes = new TextEncoder().encode(id);
-    const header = JSON.stringify({ t: "file-start", id, name: file.name, size: file.size });
+    const header = JSON.stringify({ t: "file-start", id, name: file.name, mime: file.type || "application/octet-stream", size: file.size });
     const footer = JSON.stringify({ t: "file-end", id });
     for (const [, b] of this.peers) {
       if (b.dc?.readyState === "open") b.dc.send(header);
