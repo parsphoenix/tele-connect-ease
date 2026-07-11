@@ -64,10 +64,10 @@ function LandingPage() {
       await router.invalidate();
       navigate({ to: "/dashboard" });
     } catch (err) {
-      const msg = (err as Error).message;
+      const msg = (err as Error).message || "";
       if (msg.includes("CAPTCHA")) toast.error(t("invalid_captcha"));
       else if (msg.includes("INVALID_CREDENTIALS")) toast.error(t("invalid_credentials"));
-      else toast.error(t("error_generic"));
+      else toast.error(msg ? `${t("error_generic")}: ${msg}` : t("error_generic"));
       regen();
       setCaptchaAnswer("");
     } finally {
