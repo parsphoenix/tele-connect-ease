@@ -147,21 +147,6 @@ function LandingPage() {
                 ? "با وارد کردن نام کاربری، در صورت نبود، حساب خودکار ساخته می‌شود."
                 : "If the username doesn't exist, an account will be created automatically."}
             </p>
-            <div className="mt-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
-              {lang === "fa" ? (
-                <>
-                  حساب آزمایشی: <span className="font-mono text-primary">demo</span> /{" "}
-                  <span className="font-mono text-primary">demo1234</span>
-                  <br />
-                  یا یک نام کاربری جدید وارد کنید تا حساب ساخته شود.
-                </>
-              ) : (
-                <>
-                  Demo: <span className="font-mono text-primary">demo</span> /{" "}
-                  <span className="font-mono text-primary">demo1234</span>
-                </>
-              )}
-            </div>
             <form onSubmit={onSubmit} className="mt-6 space-y-4">
               <div>
                 <Label htmlFor="u">{t("username")}</Label>
