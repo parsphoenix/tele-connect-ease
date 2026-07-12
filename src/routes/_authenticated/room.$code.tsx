@@ -24,6 +24,7 @@ import {
   AFK_TIMEOUT_MS,
   CHAT_PAGE_SIZE,
 } from "@/lib/chat-utils";
+import { loadPrefs } from "@/lib/user-prefs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -49,6 +50,9 @@ import {
   PictureInPicture2,
   Smile,
   Moon,
+  Circle,
+  Square,
+  Youtube,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/room/$code")({
@@ -143,8 +147,9 @@ function RoomPage() {
   const banFn = useServerFn(banFromRoom);
   const kickFn = useServerFn(kickFromRoom);
 
+  const [prefs] = useState(() => loadPrefs());
   const [ready, setReady] = useState(false);
-  const [micOn, setMicOn] = useState(true);
+  const [micOn, setMicOn] = useState(!prefs.pushToTalk); // if PTT, mic off by default
   const [camOn, setCamOn] = useState(false); // camera OFF by default
   const [screenOn, setScreenOn] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
@@ -159,10 +164,18 @@ function RoomPage() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [afk, setAfk] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [recording, setRecording] = useState(false);
+  const [peersRecording, setPeersRecording] = useState<Set<number>>(new Set());
+  const [sharedVideo, setSharedVideo] = useState<{ url: string; playing: boolean; time: number } | null>(null);
+  const [videoUrlInput, setVideoUrlInput] = useState("");
   const startedAtRef = useRef<number>(0);
   const lastActivityRef = useRef<number>(Date.now());
   const lastMsgAtRef = useRef<number>(0);
   const lastPokeAtRef = useRef<Record<number, number>>({});
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recChunksRef = useRef<BlobPart[]>([]);
+  const sharedVideoRef = useRef<HTMLVideoElement | null>(null);
+  const suppressVideoEventsRef = useRef(false);
 
   const managerRef = useRef<MeshManager | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -311,14 +324,33 @@ function RoomPage() {
               } else if (msg.type === "kicked" && (msg.to as number) === meRef.current?.id) {
                 toast.error("You have been removed from the room");
                 navigate({ to: "/dashboard" });
+              } else if (msg.type === "rec") {
+                setPeersRecording((s) => {
+                  const n = new Set(s);
+                  if (msg.value) n.add(userId);
+                  else n.delete(userId);
+                  return n;
+                });
+              } else if (msg.type === "video") {
+                suppressVideoEventsRef.current = true;
+                setSharedVideo(
+                  msg.url
+                    ? { url: msg.url as string, playing: Boolean(msg.playing), time: Number(msg.time ?? 0) }
+                    : null,
+                );
+                setTimeout(() => (suppressVideoEventsRef.current = false), 300);
               }
             },
           },
         });
         managerRef.current = manager;
 
-        // Start media with camera off (audio only initially)
-        await manager.initMedia(QUALITY_PRESETS.medium, false, true);
+        // Start media using selected devices; camera off by default; mic follows PTT setting
+        await manager.initMedia(QUALITY_PRESETS.medium, false, true, {
+          audioDeviceId: prefs.microphoneDeviceId,
+          videoDeviceId: prefs.cameraDeviceId,
+        });
+        if (prefs.pushToTalk) manager.toggleMic(false);
         if (localVideoRef.current && manager.getLocalStream()) {
           localVideoRef.current.srcObject = manager.getLocalStream();
         }
@@ -533,6 +565,122 @@ function RoomPage() {
     }
   }
 
+  // Recording (mix local + remote audio via WebAudio, plus local video track if on)
+  async function toggleRecord() {
+    if (recording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    try {
+      const local = managerRef.current?.getLocalStream();
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ac = new AC();
+      const dest = ac.createMediaStreamDestination();
+      if (local && local.getAudioTracks().length) ac.createMediaStreamSource(local).connect(dest);
+      for (const p of Object.values(peers)) {
+        if (p.stream && p.stream.getAudioTracks().length) {
+          try { ac.createMediaStreamSource(p.stream).connect(dest); } catch {}
+        }
+      }
+      const mix = new MediaStream();
+      dest.stream.getAudioTracks().forEach((t) => mix.addTrack(t));
+      const vt = local?.getVideoTracks()[0];
+      if (vt && vt.enabled) mix.addTrack(vt);
+      const rec = new MediaRecorder(mix, { mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus" : "video/webm" });
+      recChunksRef.current = [];
+      rec.ondataavailable = (e) => { if (e.data.size) recChunksRef.current.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(recChunksRef.current, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `parstalk-${upperCode}-${Date.now()}.webm`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        ac.close().catch(() => {});
+        setRecording(false);
+        managerRef.current?.sendControl({ type: "rec", value: false });
+      };
+      rec.start(1000);
+      recorderRef.current = rec;
+      setRecording(true);
+      managerRef.current?.sendControl({ type: "rec", value: true });
+      toast.success("● REC");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  // Shared video: broadcast play/pause/seek to peers
+  function broadcastVideo(state: { url: string | null; playing: boolean; time: number }) {
+    managerRef.current?.sendControl({ type: "video", url: state.url ?? "", playing: state.playing, time: state.time });
+  }
+  function startSharedVideo() {
+    const u = videoUrlInput.trim();
+    if (!u) return;
+    const s = { url: u, playing: true, time: 0 };
+    setSharedVideo(s);
+    broadcastVideo(s);
+    setVideoUrlInput("");
+  }
+  function stopSharedVideo() {
+    setSharedVideo(null);
+    broadcastVideo({ url: null, playing: false, time: 0 });
+  }
+  // Sync shared-video element with state received from peers
+  useEffect(() => {
+    const v = sharedVideoRef.current;
+    if (!v || !sharedVideo) return;
+    suppressVideoEventsRef.current = true;
+    if (Math.abs(v.currentTime - sharedVideo.time) > 1) v.currentTime = sharedVideo.time;
+    if (sharedVideo.playing) v.play().catch(() => {});
+    else v.pause();
+    setTimeout(() => (suppressVideoEventsRef.current = false), 300);
+  }, [sharedVideo]);
+
+  // Hotkeys + Push-to-talk
+  useEffect(() => {
+    if (!ready) return;
+    const normalize = (e: KeyboardEvent) => {
+      if (e.code === "Space") return "Space";
+      return e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    };
+    const isTyping = () => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+    };
+    const onDown = (e: KeyboardEvent) => {
+      if (isTyping()) return;
+      const k = normalize(e);
+      if (prefs.pushToTalk && k === prefs.hotkeys.ptt) {
+        e.preventDefault();
+        if (!micOn) { setMicOn(true); managerRef.current?.toggleMic(true); }
+        return;
+      }
+      if (k === prefs.hotkeys.mic) { e.preventDefault(); onToggleMic(); }
+      else if (k === prefs.hotkeys.cam) { e.preventDefault(); onToggleCam(); }
+      else if (k === prefs.hotkeys.screen) { e.preventDefault(); onToggleScreen(); }
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (isTyping()) return;
+      const k = normalize(e);
+      if (prefs.pushToTalk && k === prefs.hotkeys.ptt) {
+        e.preventDefault();
+        setMicOn(false);
+        managerRef.current?.toggleMic(false);
+      }
+    };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, prefs, micOn]);
+
   const setPeerVolume = useCallback((id: number, v: number) => {
     setPeers((p) => (p[id] ? { ...p, [id]: { ...p[id], volume: v } } : p));
   }, []);
@@ -581,8 +729,43 @@ function RoomPage() {
         <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{totalTiles}</span>
           <span className="tabular-nums font-mono">{fmtDuration(duration)}</span>
+          {(recording || peersRecording.size > 0) && (
+            <span className="flex items-center gap-1 text-destructive font-bold animate-pulse">
+              <Circle className="h-2 w-2 fill-current" /> REC
+            </span>
+          )}
         </div>
       </div>
+
+      {/* Shared video overlay */}
+      {sharedVideo && (
+        <div className="border-b border-border bg-black/80 p-2 flex items-center gap-2">
+          <video
+            ref={sharedVideoRef}
+            src={sharedVideo.url}
+            controls
+            className="w-full max-h-64 rounded"
+            onPlay={() => {
+              if (suppressVideoEventsRef.current) return;
+              const v = sharedVideoRef.current;
+              broadcastVideo({ url: sharedVideo.url, playing: true, time: v?.currentTime ?? 0 });
+            }}
+            onPause={() => {
+              if (suppressVideoEventsRef.current) return;
+              const v = sharedVideoRef.current;
+              broadcastVideo({ url: sharedVideo.url, playing: false, time: v?.currentTime ?? 0 });
+            }}
+            onSeeked={() => {
+              if (suppressVideoEventsRef.current) return;
+              const v = sharedVideoRef.current;
+              broadcastVideo({ url: sharedVideo.url, playing: !v?.paused, time: v?.currentTime ?? 0 });
+            }}
+          />
+          <button onClick={stopSharedVideo} className="rounded-md bg-destructive p-2 text-destructive-foreground shrink-0" aria-label="stop video">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Main split */}
       <div className="flex flex-1 min-h-0">
@@ -630,6 +813,9 @@ function RoomPage() {
             <button onClick={() => setChatOpen(!chatOpen)} className={`grid h-11 w-11 place-items-center rounded-full border border-border ${chatOpen ? "bg-primary text-primary-foreground" : "bg-secondary"} hover:brightness-110 lg:hidden`} aria-label={t("chat")}>
               <MessageSquare className="h-5 w-5" />
             </button>
+            <button onClick={toggleRecord} className={`grid h-11 w-11 place-items-center rounded-full border border-border ${recording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-secondary"} hover:brightness-110`} aria-label="record" title="Record">
+              {recording ? <Square className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+            </button>
             <button onClick={onLeave} className="grid h-11 w-11 place-items-center rounded-full bg-destructive text-destructive-foreground hover:brightness-110" aria-label={t("leave_room")}>
               <Phone className="h-5 w-5 rotate-[135deg]" />
             </button>
@@ -665,6 +851,25 @@ function RoomPage() {
                   <NumField label={t("audio_bitrate")} value={customQ.audioBitrateKbps} onChange={(v) => setCustomQ({ ...customQ, audioBitrateKbps: v })} />
                 </div>
               )}
+              <div className="mt-4 border-t border-border pt-3">
+                <div className="text-sm font-bold mb-2 flex items-center gap-2"><Youtube className="h-4 w-4 text-primary" /> Shared Video</div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://.../video.mp4"
+                    value={videoUrlInput}
+                    onChange={(e) => setVideoUrlInput(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button type="button" onClick={startSharedVideo} disabled={!videoUrlInput.trim()}>
+                    ▶
+                  </Button>
+                  {sharedVideo && (
+                    <Button type="button" variant="destructive" onClick={stopSharedVideo}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>

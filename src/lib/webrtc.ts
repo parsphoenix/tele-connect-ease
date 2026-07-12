@@ -63,24 +63,45 @@ export class MeshManager {
     this.send = opts.send;
   }
 
-  async initMedia(quality: QualityConfig, enableVideo = true, enableAudio = true) {
+  async initMedia(
+    quality: QualityConfig,
+    enableVideo = true,
+    enableAudio = true,
+    devices?: { audioDeviceId?: string | null; videoDeviceId?: string | null },
+  ) {
     this.currentQuality = quality;
+    const audioC: MediaTrackConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
+    if (devices?.audioDeviceId) audioC.deviceId = { exact: devices.audioDeviceId };
+    const videoC: MediaTrackConstraints = {
+      width: { ideal: quality.width },
+      height: { ideal: quality.height },
+      frameRate: { ideal: quality.frameRate },
+    };
+    if (devices?.videoDeviceId) videoC.deviceId = { exact: devices.videoDeviceId };
     const constraints: MediaStreamConstraints = {
-      audio: enableAudio
-        ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-        : false,
-      video: enableVideo
-        ? {
-            width: { ideal: quality.width },
-            height: { ideal: quality.height },
-            frameRate: { ideal: quality.frameRate },
-          }
-        : false,
+      audio: enableAudio ? audioC : false,
+      video: enableVideo ? videoC : false,
     };
     try {
-      this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
-    } catch (e) {
-      // fallback audio only
+      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+      // If we already have a stream, replace tracks on existing senders
+      if (this.localStream) {
+        const oldTracks = this.localStream.getTracks();
+        oldTracks.forEach((t) => t.stop());
+        for (const [, b] of this.peers) {
+          for (const nt of newStream.getTracks()) {
+            const sender = b.pc.getSenders().find((s) => s.track?.kind === nt.kind);
+            if (sender) await sender.replaceTrack(nt);
+            else b.pc.addTrack(nt, newStream);
+          }
+        }
+      }
+      this.localStream = newStream;
+    } catch {
       this.localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     }
     return this.localStream;
