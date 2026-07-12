@@ -813,6 +813,9 @@ function RoomPage() {
             <button onClick={() => setChatOpen(!chatOpen)} className={`grid h-11 w-11 place-items-center rounded-full border border-border ${chatOpen ? "bg-primary text-primary-foreground" : "bg-secondary"} hover:brightness-110 lg:hidden`} aria-label={t("chat")}>
               <MessageSquare className="h-5 w-5" />
             </button>
+            <button onClick={toggleRecord} className={`grid h-11 w-11 place-items-center rounded-full border border-border ${recording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-secondary"} hover:brightness-110`} aria-label="record" title="Record">
+              {recording ? <Square className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+            </button>
             <button onClick={onLeave} className="grid h-11 w-11 place-items-center rounded-full bg-destructive text-destructive-foreground hover:brightness-110" aria-label={t("leave_room")}>
               <Phone className="h-5 w-5 rotate-[135deg]" />
             </button>
