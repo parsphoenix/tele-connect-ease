@@ -324,14 +324,33 @@ function RoomPage() {
               } else if (msg.type === "kicked" && (msg.to as number) === meRef.current?.id) {
                 toast.error("You have been removed from the room");
                 navigate({ to: "/dashboard" });
+              } else if (msg.type === "rec") {
+                setPeersRecording((s) => {
+                  const n = new Set(s);
+                  if (msg.value) n.add(userId);
+                  else n.delete(userId);
+                  return n;
+                });
+              } else if (msg.type === "video") {
+                suppressVideoEventsRef.current = true;
+                setSharedVideo(
+                  msg.url
+                    ? { url: msg.url as string, playing: Boolean(msg.playing), time: Number(msg.time ?? 0) }
+                    : null,
+                );
+                setTimeout(() => (suppressVideoEventsRef.current = false), 300);
               }
             },
           },
         });
         managerRef.current = manager;
 
-        // Start media with camera off (audio only initially)
-        await manager.initMedia(QUALITY_PRESETS.medium, false, true);
+        // Start media using selected devices; camera off by default; mic follows PTT setting
+        await manager.initMedia(QUALITY_PRESETS.medium, false, true, {
+          audioDeviceId: prefs.microphoneDeviceId,
+          videoDeviceId: prefs.cameraDeviceId,
+        });
+        if (prefs.pushToTalk) manager.toggleMic(false);
         if (localVideoRef.current && manager.getLocalStream()) {
           localVideoRef.current.srcObject = manager.getLocalStream();
         }
