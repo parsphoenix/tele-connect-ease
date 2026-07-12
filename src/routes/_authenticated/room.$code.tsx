@@ -24,6 +24,7 @@ import {
   AFK_TIMEOUT_MS,
   CHAT_PAGE_SIZE,
 } from "@/lib/chat-utils";
+import { loadPrefs } from "@/lib/user-prefs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -49,6 +50,9 @@ import {
   PictureInPicture2,
   Smile,
   Moon,
+  Circle,
+  Square,
+  Youtube,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/room/$code")({
