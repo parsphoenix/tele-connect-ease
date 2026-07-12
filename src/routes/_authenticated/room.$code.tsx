@@ -729,8 +729,43 @@ function RoomPage() {
         <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1"><Users className="h-3.5 w-3.5" />{totalTiles}</span>
           <span className="tabular-nums font-mono">{fmtDuration(duration)}</span>
+          {(recording || peersRecording.size > 0) && (
+            <span className="flex items-center gap-1 text-destructive font-bold animate-pulse">
+              <Circle className="h-2 w-2 fill-current" /> REC
+            </span>
+          )}
         </div>
       </div>
+
+      {/* Shared video overlay */}
+      {sharedVideo && (
+        <div className="border-b border-border bg-black/80 p-2 flex items-center gap-2">
+          <video
+            ref={sharedVideoRef}
+            src={sharedVideo.url}
+            controls
+            className="w-full max-h-64 rounded"
+            onPlay={() => {
+              if (suppressVideoEventsRef.current) return;
+              const v = sharedVideoRef.current;
+              broadcastVideo({ url: sharedVideo.url, playing: true, time: v?.currentTime ?? 0 });
+            }}
+            onPause={() => {
+              if (suppressVideoEventsRef.current) return;
+              const v = sharedVideoRef.current;
+              broadcastVideo({ url: sharedVideo.url, playing: false, time: v?.currentTime ?? 0 });
+            }}
+            onSeeked={() => {
+              if (suppressVideoEventsRef.current) return;
+              const v = sharedVideoRef.current;
+              broadcastVideo({ url: sharedVideo.url, playing: !v?.paused, time: v?.currentTime ?? 0 });
+            }}
+          />
+          <button onClick={stopSharedVideo} className="rounded-md bg-destructive p-2 text-destructive-foreground shrink-0" aria-label="stop video">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Main split */}
       <div className="flex flex-1 min-h-0">
