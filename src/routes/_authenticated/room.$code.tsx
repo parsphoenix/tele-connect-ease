@@ -565,6 +565,122 @@ function RoomPage() {
     }
   }
 
+  // Recording (mix local + remote audio via WebAudio, plus local video track if on)
+  async function toggleRecord() {
+    if (recording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    try {
+      const local = managerRef.current?.getLocalStream();
+      const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ac = new AC();
+      const dest = ac.createMediaStreamDestination();
+      if (local && local.getAudioTracks().length) ac.createMediaStreamSource(local).connect(dest);
+      for (const p of Object.values(peers)) {
+        if (p.stream && p.stream.getAudioTracks().length) {
+          try { ac.createMediaStreamSource(p.stream).connect(dest); } catch {}
+        }
+      }
+      const mix = new MediaStream();
+      dest.stream.getAudioTracks().forEach((t) => mix.addTrack(t));
+      const vt = local?.getVideoTracks()[0];
+      if (vt && vt.enabled) mix.addTrack(vt);
+      const rec = new MediaRecorder(mix, { mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus" : "video/webm" });
+      recChunksRef.current = [];
+      rec.ondataavailable = (e) => { if (e.data.size) recChunksRef.current.push(e.data); };
+      rec.onstop = () => {
+        const blob = new Blob(recChunksRef.current, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `parstalk-${upperCode}-${Date.now()}.webm`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        ac.close().catch(() => {});
+        setRecording(false);
+        managerRef.current?.sendControl({ type: "rec", value: false });
+      };
+      rec.start(1000);
+      recorderRef.current = rec;
+      setRecording(true);
+      managerRef.current?.sendControl({ type: "rec", value: true });
+      toast.success("● REC");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  // Shared video: broadcast play/pause/seek to peers
+  function broadcastVideo(state: { url: string | null; playing: boolean; time: number }) {
+    managerRef.current?.sendControl({ type: "video", url: state.url ?? "", playing: state.playing, time: state.time });
+  }
+  function startSharedVideo() {
+    const u = videoUrlInput.trim();
+    if (!u) return;
+    const s = { url: u, playing: true, time: 0 };
+    setSharedVideo(s);
+    broadcastVideo(s);
+    setVideoUrlInput("");
+  }
+  function stopSharedVideo() {
+    setSharedVideo(null);
+    broadcastVideo({ url: null, playing: false, time: 0 });
+  }
+  // Sync shared-video element with state received from peers
+  useEffect(() => {
+    const v = sharedVideoRef.current;
+    if (!v || !sharedVideo) return;
+    suppressVideoEventsRef.current = true;
+    if (Math.abs(v.currentTime - sharedVideo.time) > 1) v.currentTime = sharedVideo.time;
+    if (sharedVideo.playing) v.play().catch(() => {});
+    else v.pause();
+    setTimeout(() => (suppressVideoEventsRef.current = false), 300);
+  }, [sharedVideo]);
+
+  // Hotkeys + Push-to-talk
+  useEffect(() => {
+    if (!ready) return;
+    const normalize = (e: KeyboardEvent) => {
+      if (e.code === "Space") return "Space";
+      return e.key.length === 1 ? e.key.toUpperCase() : e.key;
+    };
+    const isTyping = () => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+    };
+    const onDown = (e: KeyboardEvent) => {
+      if (isTyping()) return;
+      const k = normalize(e);
+      if (prefs.pushToTalk && k === prefs.hotkeys.ptt) {
+        e.preventDefault();
+        if (!micOn) { setMicOn(true); managerRef.current?.toggleMic(true); }
+        return;
+      }
+      if (k === prefs.hotkeys.mic) { e.preventDefault(); onToggleMic(); }
+      else if (k === prefs.hotkeys.cam) { e.preventDefault(); onToggleCam(); }
+      else if (k === prefs.hotkeys.screen) { e.preventDefault(); onToggleScreen(); }
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (isTyping()) return;
+      const k = normalize(e);
+      if (prefs.pushToTalk && k === prefs.hotkeys.ptt) {
+        e.preventDefault();
+        setMicOn(false);
+        managerRef.current?.toggleMic(false);
+      }
+    };
+    window.addEventListener("keydown", onDown);
+    window.addEventListener("keyup", onUp);
+    return () => {
+      window.removeEventListener("keydown", onDown);
+      window.removeEventListener("keyup", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, prefs, micOn]);
+
   const setPeerVolume = useCallback((id: number, v: number) => {
     setPeers((p) => (p[id] ? { ...p, [id]: { ...p[id], volume: v } } : p));
   }, []);
