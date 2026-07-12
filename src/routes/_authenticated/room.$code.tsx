@@ -852,7 +852,7 @@ function RoomPage() {
                 </div>
               )}
               <div className="mt-4 border-t border-border pt-3">
-                <div className="text-sm font-bold mb-2 flex items-center gap-2"><Youtube className="h-4 w-4 text-primary" /> {t("shared_video") || "Shared Video"}</div>
+                <div className="text-sm font-bold mb-2 flex items-center gap-2"><Youtube className="h-4 w-4 text-primary" /> Shared Video</div>
                 <div className="flex gap-2">
                   <Input
                     placeholder="https://.../video.mp4"
