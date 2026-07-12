@@ -147,8 +147,9 @@ function RoomPage() {
   const banFn = useServerFn(banFromRoom);
   const kickFn = useServerFn(kickFromRoom);
 
+  const [prefs] = useState(() => loadPrefs());
   const [ready, setReady] = useState(false);
-  const [micOn, setMicOn] = useState(true);
+  const [micOn, setMicOn] = useState(!prefs.pushToTalk); // if PTT, mic off by default
   const [camOn, setCamOn] = useState(false); // camera OFF by default
   const [screenOn, setScreenOn] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
@@ -163,10 +164,18 @@ function RoomPage() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [afk, setAfk] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [recording, setRecording] = useState(false);
+  const [peersRecording, setPeersRecording] = useState<Set<number>>(new Set());
+  const [sharedVideo, setSharedVideo] = useState<{ url: string; playing: boolean; time: number } | null>(null);
+  const [videoUrlInput, setVideoUrlInput] = useState("");
   const startedAtRef = useRef<number>(0);
   const lastActivityRef = useRef<number>(Date.now());
   const lastMsgAtRef = useRef<number>(0);
   const lastPokeAtRef = useRef<Record<number, number>>({});
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recChunksRef = useRef<BlobPart[]>([]);
+  const sharedVideoRef = useRef<HTMLVideoElement | null>(null);
+  const suppressVideoEventsRef = useRef(false);
 
   const managerRef = useRef<MeshManager | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
