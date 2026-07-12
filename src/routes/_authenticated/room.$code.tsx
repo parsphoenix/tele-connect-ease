@@ -851,6 +851,25 @@ function RoomPage() {
                   <NumField label={t("audio_bitrate")} value={customQ.audioBitrateKbps} onChange={(v) => setCustomQ({ ...customQ, audioBitrateKbps: v })} />
                 </div>
               )}
+              <div className="mt-4 border-t border-border pt-3">
+                <div className="text-sm font-bold mb-2 flex items-center gap-2"><Youtube className="h-4 w-4 text-primary" /> {t("shared_video") || "Shared Video"}</div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://.../video.mp4"
+                    value={videoUrlInput}
+                    onChange={(e) => setVideoUrlInput(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button type="button" onClick={startSharedVideo} disabled={!videoUrlInput.trim()}>
+                    ▶
+                  </Button>
+                  {sharedVideo && (
+                    <Button type="button" variant="destructive" onClick={stopSharedVideo}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
