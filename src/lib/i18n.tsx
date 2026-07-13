@@ -201,6 +201,8 @@ const translations = {
     banned: "You are banned from this room",
     room_full: "Room is full",
     password_invalid: "Wrong room password",
+    captcha_invalid: "Invalid captcha",
+    captcha_label: "Enter the sum",
     owner: "Room owner",
     kick: "Kick",
     ban: "Ban",
