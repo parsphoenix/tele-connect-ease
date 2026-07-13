@@ -206,6 +206,21 @@ export const listRoomMembers = createServerFn({ method: "GET" })
     return rows;
   });
 
+/** Send a signaling control message so peers know a kick/ban happened */
+async function broadcastKickSignal(roomCode: string, fromUserId: number, toUserId: number, reason: "kick" | "ban") {
+  const payload = JSON.stringify({ type: "kicked", to: toUserId, reason });
+  await query(
+    "INSERT INTO signaling (room_code, from_user, to_user, payload) VALUES (?, ?, ?, ?)",
+    [roomCode.toUpperCase(), fromUserId, toUserId, payload],
+  );
+  // Also clear their presence so friend list shows correct state
+  await query(
+    `INSERT INTO presence (user_id, room_code, status) VALUES (?, NULL, 'online')
+     ON DUPLICATE KEY UPDATE room_code = NULL, status = 'online'`,
+    [toUserId],
+  );
+}
+
 /** Owner-only: ban a user from the room (removes them & prevents rejoin) */
 export const banFromRoom = createServerFn({ method: "POST" })
   .validator((d: unknown) =>
@@ -224,6 +239,7 @@ export const banFromRoom = createServerFn({ method: "POST" })
       "INSERT IGNORE INTO room_bans (room_id, user_id) VALUES (?, ?)",
       [rows[0].id, data.userId],
     );
+    await broadcastKickSignal(data.code, user.id, data.userId, "ban");
     await query("DELETE FROM room_members WHERE room_id = ? AND user_id = ?", [
       rows[0].id,
       data.userId,
@@ -245,6 +261,7 @@ export const kickFromRoom = createServerFn({ method: "POST" })
     if (!rows[0]) throw new Error("ROOM_NOT_FOUND");
     if (rows[0].owner_id !== user.id) throw new Error("NOT_OWNER");
     if (rows[0].owner_id === data.userId) throw new Error("CANNOT_KICK_OWNER");
+    await broadcastKickSignal(data.code, user.id, data.userId, "kick");
     await query("DELETE FROM room_members WHERE room_id = ? AND user_id = ?", [
       rows[0].id,
       data.userId,
