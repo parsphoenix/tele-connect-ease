@@ -760,9 +760,6 @@ function RoomPage() {
       {/* Shared video overlay */}
       {sharedVideo && (
         <div className="border-b border-border bg-black/80 p-2 flex items-center gap-2">
-      {/* Shared video overlay */}
-      {sharedVideo && (
-        <div className="border-b border-border bg-black/80 p-2 flex items-center gap-2">
           {(() => {
             const embed = toEmbedUrl(sharedVideo.url);
             if (embed) {
