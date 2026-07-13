@@ -1085,40 +1085,40 @@ function RoomPage() {
         </div>
       )}
       {/* Password prompt */}
-      <Dialog open={passwordPrompt} onOpenChange={(o) => { if (!o) navigate({ to: "/dashboard" }); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t("enter_room_password")}</DialogTitle>
-          </DialogHeader>
-          <Input
-            type="password"
-            value={passwordInput}
-            onChange={(e) => setPasswordInput(e.target.value)}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                pendingPasswordRef.current = passwordInput;
-                setPasswordPrompt(false);
-                setPasswordInput("");
-                setJoinKey((k) => k + 1);
-              }
-            }}
-          />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => navigate({ to: "/dashboard" })}>{t("cancel")}</Button>
-            <Button
-              onClick={() => {
-                pendingPasswordRef.current = passwordInput;
-                setPasswordPrompt(false);
-                setPasswordInput("");
-                setJoinKey((k) => k + 1);
+      {passwordPrompt && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur">
+          <div className="w-full max-w-sm rounded-lg border border-border bg-card p-4 space-y-3">
+            <h3 className="font-bold">{t("enter_room_password")}</h3>
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  pendingPasswordRef.current = passwordInput;
+                  setPasswordPrompt(false);
+                  setPasswordInput("");
+                  setJoinKey((k) => k + 1);
+                }
               }}
-            >
-              {t("apply")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => navigate({ to: "/dashboard" })}>{t("cancel")}</Button>
+              <Button
+                onClick={() => {
+                  pendingPasswordRef.current = passwordInput;
+                  setPasswordPrompt(false);
+                  setPasswordInput("");
+                  setJoinKey((k) => k + 1);
+                }}
+              >
+                {t("apply")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
