@@ -760,27 +760,46 @@ function RoomPage() {
       {/* Shared video overlay */}
       {sharedVideo && (
         <div className="border-b border-border bg-black/80 p-2 flex items-center gap-2">
-          <video
-            ref={sharedVideoRef}
-            src={sharedVideo.url}
-            controls
-            className="w-full max-h-64 rounded"
-            onPlay={() => {
-              if (suppressVideoEventsRef.current) return;
-              const v = sharedVideoRef.current;
-              broadcastVideo({ url: sharedVideo.url, playing: true, time: v?.currentTime ?? 0 });
-            }}
-            onPause={() => {
-              if (suppressVideoEventsRef.current) return;
-              const v = sharedVideoRef.current;
-              broadcastVideo({ url: sharedVideo.url, playing: false, time: v?.currentTime ?? 0 });
-            }}
-            onSeeked={() => {
-              if (suppressVideoEventsRef.current) return;
-              const v = sharedVideoRef.current;
-              broadcastVideo({ url: sharedVideo.url, playing: !v?.paused, time: v?.currentTime ?? 0 });
-            }}
-          />
+      {/* Shared video overlay */}
+      {sharedVideo && (
+        <div className="border-b border-border bg-black/80 p-2 flex items-center gap-2">
+          {(() => {
+            const embed = toEmbedUrl(sharedVideo.url);
+            if (embed) {
+              return (
+                <iframe
+                  src={embed}
+                  className="w-full aspect-video max-h-64 rounded"
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                  title="shared video"
+                />
+              );
+            }
+            return (
+              <video
+                ref={sharedVideoRef}
+                src={sharedVideo.url}
+                controls
+                className="w-full max-h-64 rounded"
+                onPlay={() => {
+                  if (suppressVideoEventsRef.current) return;
+                  const v = sharedVideoRef.current;
+                  broadcastVideo({ url: sharedVideo.url, playing: true, time: v?.currentTime ?? 0 });
+                }}
+                onPause={() => {
+                  if (suppressVideoEventsRef.current) return;
+                  const v = sharedVideoRef.current;
+                  broadcastVideo({ url: sharedVideo.url, playing: false, time: v?.currentTime ?? 0 });
+                }}
+                onSeeked={() => {
+                  if (suppressVideoEventsRef.current) return;
+                  const v = sharedVideoRef.current;
+                  broadcastVideo({ url: sharedVideo.url, playing: !v?.paused, time: v?.currentTime ?? 0 });
+                }}
+              />
+            );
+          })()}
           <button onClick={stopSharedVideo} className="rounded-md bg-destructive p-2 text-destructive-foreground shrink-0" aria-label="stop video">
             <X className="h-4 w-4" />
           </button>
