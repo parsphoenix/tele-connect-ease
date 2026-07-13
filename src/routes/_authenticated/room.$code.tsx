@@ -53,6 +53,11 @@ import {
   Circle,
   Square,
   Youtube,
+  Wifi,
+  WifiOff,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/room/$code")({
