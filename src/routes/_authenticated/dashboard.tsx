@@ -303,6 +303,18 @@ function Dashboard() {
                     className="w-full mt-2 accent-primary"
                   />
                 </div>
+                <div>
+                  <Label>
+                    {t("captcha_label")}: <span className="font-bold">{captchaA} + {captchaB} = ?</span>
+                  </Label>
+                  <Input
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value.replace(/[^0-9]/g, ""))}
+                    className="mt-1 w-24"
+                    inputMode="numeric"
+                    maxLength={3}
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setDialogOpen(false)}>
@@ -310,7 +322,7 @@ function Dashboard() {
                 </Button>
                 <Button
                   onClick={() => createMut.mutate()}
-                  disabled={!name.trim() || createMut.isPending}
+                  disabled={!name.trim() || !captchaInput || createMut.isPending}
                 >
                   {t("create")}
                 </Button>
