@@ -93,6 +93,35 @@ function fmtDuration(sec: number) {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
+/** Convert YouTube/Aparat/generic URLs to an embeddable iframe URL. Returns null if it's a plain media file. */
+function toEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    // YouTube
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      const v = u.searchParams.get("v");
+      if (v) return `https://www.youtube.com/embed/${v}?autoplay=1`;
+      if (u.pathname.startsWith("/embed/")) return url;
+    }
+    if (host === "youtu.be") {
+      const id = u.pathname.slice(1);
+      if (id) return `https://www.youtube.com/embed/${id}?autoplay=1`;
+    }
+    // Aparat
+    if (host === "aparat.com" || host.endsWith(".aparat.com")) {
+      const m = u.pathname.match(/\/v\/([A-Za-z0-9]+)/);
+      if (m) return `https://www.aparat.com/video/video/embed/videohash/${m[1]}/vt/frame`;
+      if (u.pathname.includes("/embed/")) return url;
+    }
+    // Already an embed/iframe URL
+    if (u.pathname.includes("/embed/") || u.searchParams.get("embed") === "1") return url;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /** Attach WebAudio analyser to a stream and call cb(speaking) via requestAnimationFrame loop */
 function useSpeakingDetector(stream: MediaStream | null | undefined, onSpeaking: (v: boolean) => void) {
   useEffect(() => {
