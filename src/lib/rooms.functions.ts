@@ -16,7 +16,7 @@ async function cleanupEmptyRooms() {
   await query(
     `DELETE r FROM rooms r
      LEFT JOIN room_members m ON m.room_id = r.id
-     WHERE m.user_id IS NULL AND r.created_at < DATE_SUB(NOW(), INTERVAL 2 MINUTE)`,
+     WHERE m.user_id IS NULL AND r.created_at < DATE_SUB(NOW(), INTERVAL 3 MINUTE)`,
   );
 }
 
@@ -51,16 +51,41 @@ export const createRoom = createServerFn({ method: "POST" })
         isPublic: z.boolean().default(false),
         maxUsers: z.number().int().min(2).max(16).default(16),
         password: z.string().max(64).optional(),
+        captchaAnswer: z.number().int().optional(),
+        captchaExpected: z.number().int().optional(),
       })
       .parse(d),
   )
   .handler(async ({ data }) => {
     const user = await requireUser();
-    const code = makeCode();
+    if (
+      typeof data.captchaAnswer === "number" &&
+      typeof data.captchaExpected === "number" &&
+      data.captchaAnswer !== data.captchaExpected
+    ) {
+      throw new Error("CAPTCHA_INVALID");
+    }
+    let code = "";
     const pwHash = data.password ? await bcrypt.hash(data.password, 10) : null;
+    for (let i = 0; i < 5; i++) {
+      const c = makeCode();
+      try {
+        await query(
+          "INSERT INTO rooms (code, name, owner_id, is_public, max_users, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
+          [c, data.name, user.id, data.isPublic ? 1 : 0, data.maxUsers, pwHash],
+        );
+        code = c;
+        break;
+      } catch (e) {
+        if (i === 4) throw e;
+      }
+    }
+    const rows = await query<{ id: number }>("SELECT id FROM rooms WHERE code = ? LIMIT 1", [code]);
+    if (!rows[0]) throw new Error("ROOM_CREATE_FAILED");
+    // Add owner as member so cleanup cannot race between create and join
     await query(
-      "INSERT INTO rooms (code, name, owner_id, is_public, max_users, password_hash) VALUES (?, ?, ?, ?, ?, ?)",
-      [code, data.name, user.id, data.isPublic, data.maxUsers, pwHash],
+      "INSERT IGNORE INTO room_members (room_id, user_id) VALUES (?, ?)",
+      [rows[0].id, user.id],
     );
     return { code };
   });
@@ -181,6 +206,21 @@ export const listRoomMembers = createServerFn({ method: "GET" })
     return rows;
   });
 
+/** Send a signaling control message so peers know a kick/ban happened */
+async function broadcastKickSignal(roomCode: string, fromUserId: number, toUserId: number, reason: "kick" | "ban") {
+  const payload = JSON.stringify({ type: "kicked", to: toUserId, reason });
+  await query(
+    "INSERT INTO signaling (room_code, from_user, to_user, payload) VALUES (?, ?, ?, ?)",
+    [roomCode.toUpperCase(), fromUserId, toUserId, payload],
+  );
+  // Also clear their presence so friend list shows correct state
+  await query(
+    `INSERT INTO presence (user_id, room_code, status) VALUES (?, NULL, 'online')
+     ON DUPLICATE KEY UPDATE room_code = NULL, status = 'online'`,
+    [toUserId],
+  );
+}
+
 /** Owner-only: ban a user from the room (removes them & prevents rejoin) */
 export const banFromRoom = createServerFn({ method: "POST" })
   .validator((d: unknown) =>
@@ -199,6 +239,7 @@ export const banFromRoom = createServerFn({ method: "POST" })
       "INSERT IGNORE INTO room_bans (room_id, user_id) VALUES (?, ?)",
       [rows[0].id, data.userId],
     );
+    await broadcastKickSignal(data.code, user.id, data.userId, "ban");
     await query("DELETE FROM room_members WHERE room_id = ? AND user_id = ?", [
       rows[0].id,
       data.userId,
@@ -220,6 +261,7 @@ export const kickFromRoom = createServerFn({ method: "POST" })
     if (!rows[0]) throw new Error("ROOM_NOT_FOUND");
     if (rows[0].owner_id !== user.id) throw new Error("NOT_OWNER");
     if (rows[0].owner_id === data.userId) throw new Error("CANNOT_KICK_OWNER");
+    await broadcastKickSignal(data.code, user.id, data.userId, "kick");
     await query("DELETE FROM room_members WHERE room_id = ? AND user_id = ?", [
       rows[0].id,
       data.userId,

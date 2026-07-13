@@ -20,7 +20,7 @@ export function linkify(text: string): Array<{ type: "text" | "link"; value: str
   return out;
 }
 
-export const CHAT_MAX_CHARS = 100;
+export const CHAT_MAX_CHARS = 500;
 export const CHAT_RATE_MS = 1500;
 export const POKE_COOLDOWN_MS = 60_000;
 export const AFK_TIMEOUT_MS = 5 * 60_000;

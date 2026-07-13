@@ -53,6 +53,11 @@ import {
   Circle,
   Square,
   Youtube,
+  Wifi,
+  WifiOff,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/room/$code")({
@@ -86,6 +91,35 @@ function fmtDuration(sec: number) {
   const s = sec % 60;
   const pad = (n: number) => n.toString().padStart(2, "0");
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+/** Convert YouTube/Aparat/generic URLs to an embeddable iframe URL. Returns null if it's a plain media file. */
+function toEmbedUrl(url: string): string | null {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    // YouTube
+    if (host === "youtube.com" || host === "m.youtube.com") {
+      const v = u.searchParams.get("v");
+      if (v) return `https://www.youtube.com/embed/${v}?autoplay=1`;
+      if (u.pathname.startsWith("/embed/")) return url;
+    }
+    if (host === "youtu.be") {
+      const id = u.pathname.slice(1);
+      if (id) return `https://www.youtube.com/embed/${id}?autoplay=1`;
+    }
+    // Aparat
+    if (host === "aparat.com" || host.endsWith(".aparat.com")) {
+      const m = u.pathname.match(/\/v\/([A-Za-z0-9]+)/);
+      if (m) return `https://www.aparat.com/video/video/embed/videohash/${m[1]}/vt/frame`;
+      if (u.pathname.includes("/embed/")) return url;
+    }
+    // Already an embed/iframe URL
+    if (u.pathname.includes("/embed/") || u.searchParams.get("embed") === "1") return url;
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 /** Attach WebAudio analyser to a stream and call cb(speaking) via requestAnimationFrame loop */
@@ -168,6 +202,11 @@ function RoomPage() {
   const [peersRecording, setPeersRecording] = useState<Set<number>>(new Set());
   const [sharedVideo, setSharedVideo] = useState<{ url: string; playing: boolean; time: number } | null>(null);
   const [videoUrlInput, setVideoUrlInput] = useState("");
+  const [passwordPrompt, setPasswordPrompt] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [chatCollapsed, setChatCollapsed] = useState(false);
+  const pendingPasswordRef = useRef<string>("");
+  const [joinKey, setJoinKey] = useState(0);
   const startedAtRef = useRef<number>(0);
   const lastActivityRef = useRef<number>(Date.now());
   const lastMsgAtRef = useRef<number>(0);
@@ -256,7 +295,17 @@ function RoomPage() {
         meRef.current = user;
         const room = await getRoomFn({ data: { code: upperCode } });
         setOwnerId(room.owner_id);
-        await joinFn({ data: { code: upperCode } });
+        try {
+          await joinFn({ data: { code: upperCode, password: pendingPasswordRef.current || undefined } });
+        } catch (e) {
+          const msg = (e as Error).message;
+          if (msg === "PASSWORD_REQUIRED" || msg === "PASSWORD_INVALID") {
+            setPasswordPrompt(true);
+            if (msg === "PASSWORD_INVALID") toast.error(t("password_invalid"));
+            return;
+          }
+          throw e;
+        }
         const iceServers = await iceFn();
 
         const manager = new MeshManager({
@@ -421,7 +470,7 @@ function RoomPage() {
       leaveFn({ data: { code: upperCode } }).catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [upperCode]);
+  }, [upperCode, joinKey]);
 
   const activeQuality = useMemo(() => {
     if (preset === "custom") return customQ;
@@ -740,27 +789,43 @@ function RoomPage() {
       {/* Shared video overlay */}
       {sharedVideo && (
         <div className="border-b border-border bg-black/80 p-2 flex items-center gap-2">
-          <video
-            ref={sharedVideoRef}
-            src={sharedVideo.url}
-            controls
-            className="w-full max-h-64 rounded"
-            onPlay={() => {
-              if (suppressVideoEventsRef.current) return;
-              const v = sharedVideoRef.current;
-              broadcastVideo({ url: sharedVideo.url, playing: true, time: v?.currentTime ?? 0 });
-            }}
-            onPause={() => {
-              if (suppressVideoEventsRef.current) return;
-              const v = sharedVideoRef.current;
-              broadcastVideo({ url: sharedVideo.url, playing: false, time: v?.currentTime ?? 0 });
-            }}
-            onSeeked={() => {
-              if (suppressVideoEventsRef.current) return;
-              const v = sharedVideoRef.current;
-              broadcastVideo({ url: sharedVideo.url, playing: !v?.paused, time: v?.currentTime ?? 0 });
-            }}
-          />
+          {(() => {
+            const embed = toEmbedUrl(sharedVideo.url);
+            if (embed) {
+              return (
+                <iframe
+                  src={embed}
+                  className="w-full aspect-video max-h-64 rounded"
+                  allow="autoplay; encrypted-media; picture-in-picture"
+                  allowFullScreen
+                  title="shared video"
+                />
+              );
+            }
+            return (
+              <video
+                ref={sharedVideoRef}
+                src={sharedVideo.url}
+                controls
+                className="w-full max-h-64 rounded"
+                onPlay={() => {
+                  if (suppressVideoEventsRef.current) return;
+                  const v = sharedVideoRef.current;
+                  broadcastVideo({ url: sharedVideo.url, playing: true, time: v?.currentTime ?? 0 });
+                }}
+                onPause={() => {
+                  if (suppressVideoEventsRef.current) return;
+                  const v = sharedVideoRef.current;
+                  broadcastVideo({ url: sharedVideo.url, playing: false, time: v?.currentTime ?? 0 });
+                }}
+                onSeeked={() => {
+                  if (suppressVideoEventsRef.current) return;
+                  const v = sharedVideoRef.current;
+                  broadcastVideo({ url: sharedVideo.url, playing: !v?.paused, time: v?.currentTime ?? 0 });
+                }}
+              />
+            );
+          })()}
           <button onClick={stopSharedVideo} className="rounded-md bg-destructive p-2 text-destructive-foreground shrink-0" aria-label="stop video">
             <X className="h-4 w-4" />
           </button>
@@ -876,17 +941,38 @@ function RoomPage() {
 
         {/* Chat side */}
         <aside
-          className={`${chatOpen ? "flex" : "hidden lg:flex"} w-full max-w-sm flex-col border-s border-border bg-card lg:w-80 fixed lg:static inset-0 z-40 lg:z-auto`}
+          className={`${chatOpen ? "flex" : "hidden lg:flex"} ${chatCollapsed ? "lg:w-12" : "w-full max-w-sm lg:w-80"} flex-col border-s border-border bg-card fixed lg:static inset-0 z-40 lg:z-auto transition-all`}
         >
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-primary" />
-              <span className="font-bold text-sm">{t("chat")}</span>
+              {!chatCollapsed && <span className="font-bold text-sm">{t("chat")}</span>}
             </div>
-            <button className="lg:hidden rounded p-1 hover:bg-secondary" onClick={() => setChatOpen(false)} aria-label="close">
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              {!chatCollapsed && (
+                <button
+                  className="rounded p-1 hover:bg-secondary text-muted-foreground"
+                  onClick={() => setChat((c) => c.filter((m) => !m.self))}
+                  title="Clear my messages"
+                  aria-label="clear"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                className="hidden lg:inline-flex rounded p-1 hover:bg-secondary"
+                onClick={() => setChatCollapsed((v) => !v)}
+                aria-label="collapse"
+              >
+                {chatCollapsed ? <ChevronUp className="h-4 w-4 rotate-90" /> : <ChevronDown className="h-4 w-4 rotate-90" />}
+              </button>
+              <button className="lg:hidden rounded p-1 hover:bg-secondary" onClick={() => setChatOpen(false)} aria-label="close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
+          {!chatCollapsed && (<>
+
           <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
             {chat.length > visibleCount && (
               <button
@@ -987,6 +1073,7 @@ function RoomPage() {
               <Send className="h-4 w-4" />
             </Button>
           </div>
+          </>)}
         </aside>
       </div>
       {!ready && (
@@ -994,6 +1081,41 @@ function RoomPage() {
           <div className="text-center">
             <div className="h-10 w-10 mx-auto rounded-full border-4 border-primary border-t-transparent animate-spin" />
             <p className="mt-3 text-sm text-muted-foreground">{t("connecting")}</p>
+          </div>
+        </div>
+      )}
+      {/* Password prompt */}
+      {passwordPrompt && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur">
+          <div className="w-full max-w-sm rounded-lg border border-border bg-card p-4 space-y-3">
+            <h3 className="font-bold">{t("enter_room_password")}</h3>
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  pendingPasswordRef.current = passwordInput;
+                  setPasswordPrompt(false);
+                  setPasswordInput("");
+                  setJoinKey((k) => k + 1);
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => navigate({ to: "/dashboard" })}>{t("cancel")}</Button>
+              <Button
+                onClick={() => {
+                  pendingPasswordRef.current = passwordInput;
+                  setPasswordPrompt(false);
+                  setPasswordInput("");
+                  setJoinKey((k) => k + 1);
+                }}
+              >
+                {t("apply")}
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -1106,7 +1228,13 @@ function VideoTile({
       )}
       <div className="absolute top-2 end-2 flex items-center gap-1">
         {ping != null && ping > 0 && (
-          <span className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-mono text-white backdrop-blur">
+          <span
+            className={`flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-mono text-white backdrop-blur ${
+              ping < 80 ? "text-success" : ping < 200 ? "text-warning" : "text-destructive"
+            }`}
+            title={`${ping}ms`}
+          >
+            {ping < 400 ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
             {ping}ms
           </span>
         )}
