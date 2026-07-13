@@ -168,6 +168,11 @@ function RoomPage() {
   const [peersRecording, setPeersRecording] = useState<Set<number>>(new Set());
   const [sharedVideo, setSharedVideo] = useState<{ url: string; playing: boolean; time: number } | null>(null);
   const [videoUrlInput, setVideoUrlInput] = useState("");
+  const [passwordPrompt, setPasswordPrompt] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [chatCollapsed, setChatCollapsed] = useState(false);
+  const pendingPasswordRef = useRef<string>("");
+  const [joinKey, setJoinKey] = useState(0);
   const startedAtRef = useRef<number>(0);
   const lastActivityRef = useRef<number>(Date.now());
   const lastMsgAtRef = useRef<number>(0);
