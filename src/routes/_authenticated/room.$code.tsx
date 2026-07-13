@@ -256,7 +256,17 @@ function RoomPage() {
         meRef.current = user;
         const room = await getRoomFn({ data: { code: upperCode } });
         setOwnerId(room.owner_id);
-        await joinFn({ data: { code: upperCode } });
+        try {
+          await joinFn({ data: { code: upperCode, password: pendingPasswordRef.current || undefined } });
+        } catch (e) {
+          const msg = (e as Error).message;
+          if (msg === "PASSWORD_REQUIRED" || msg === "PASSWORD_INVALID") {
+            setPasswordPrompt(true);
+            if (msg === "PASSWORD_INVALID") toast.error(t("password_invalid"));
+            return;
+          }
+          throw e;
+        }
         const iceServers = await iceFn();
 
         const manager = new MeshManager({
