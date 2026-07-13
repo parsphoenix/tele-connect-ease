@@ -436,7 +436,7 @@ function RoomPage() {
       leaveFn({ data: { code: upperCode } }).catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [upperCode]);
+  }, [upperCode, joinKey]);
 
   const activeQuality = useMemo(() => {
     if (preset === "custom") return customQ;
