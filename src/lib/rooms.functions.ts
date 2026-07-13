@@ -16,7 +16,7 @@ async function cleanupEmptyRooms() {
   await query(
     `DELETE r FROM rooms r
      LEFT JOIN room_members m ON m.room_id = r.id
-     WHERE m.user_id IS NULL AND r.created_at < DATE_SUB(NOW(), INTERVAL 2 MINUTE)`,
+     WHERE m.user_id IS NULL AND r.created_at < DATE_SUB(NOW(), INTERVAL 3 MINUTE)`,
   );
 }
 
@@ -51,16 +51,41 @@ export const createRoom = createServerFn({ method: "POST" })
         isPublic: z.boolean().default(false),
         maxUsers: z.number().int().min(2).max(16).default(16),
         password: z.string().max(64).optional(),
+        captchaAnswer: z.number().int().optional(),
+        captchaExpected: z.number().int().optional(),
       })
       .parse(d),
   )
   .handler(async ({ data }) => {
     const user = await requireUser();
-    const code = makeCode();
+    if (
+      typeof data.captchaAnswer === "number" &&
+      typeof data.captchaExpected === "number" &&
+      data.captchaAnswer !== data.captchaExpected
+    ) {
+      throw new Error("CAPTCHA_INVALID");
+    }
+    let code = "";
     const pwHash = data.password ? await bcrypt.hash(data.password, 10) : null;
+    for (let i = 0; i < 5; i++) {
+      const c = makeCode();
+      try {
+        await query(
+          "INSERT INTO rooms (code, name, owner_id, is_public, max_users, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())",
+          [c, data.name, user.id, data.isPublic ? 1 : 0, data.maxUsers, pwHash],
+        );
+        code = c;
+        break;
+      } catch (e) {
+        if (i === 4) throw e;
+      }
+    }
+    const rows = await query<{ id: number }>("SELECT id FROM rooms WHERE code = ? LIMIT 1", [code]);
+    if (!rows[0]) throw new Error("ROOM_CREATE_FAILED");
+    // Add owner as member so cleanup cannot race between create and join
     await query(
-      "INSERT INTO rooms (code, name, owner_id, is_public, max_users, password_hash) VALUES (?, ?, ?, ?, ?, ?)",
-      [code, data.name, user.id, data.isPublic, data.maxUsers, pwHash],
+      "INSERT IGNORE INTO room_members (room_id, user_id) VALUES (?, ?)",
+      [rows[0].id, user.id],
     );
     return { code };
   });
