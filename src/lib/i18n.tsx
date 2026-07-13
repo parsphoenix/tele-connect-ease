@@ -82,6 +82,8 @@ const translations = {
     banned: "شما از این اتاق مسدود شده‌اید",
     room_full: "اتاق پر است",
     password_invalid: "رمز اتاق اشتباه است",
+    captcha_invalid: "کد امنیتی اشتباه است",
+    captcha_label: "حاصل جمع را وارد کنید",
     owner: "سازنده اتاق",
     kick: "اخراج",
     ban: "مسدود کردن",
