@@ -71,6 +71,16 @@ function Dashboard() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const sinceRef = useRef(0);
 
+  // Simple math captcha for room creation
+  const [captchaA, setCaptchaA] = useState(() => Math.floor(Math.random() * 8) + 1);
+  const [captchaB, setCaptchaB] = useState(() => Math.floor(Math.random() * 8) + 1);
+  const [captchaInput, setCaptchaInput] = useState("");
+  const regenCaptcha = () => {
+    setCaptchaA(Math.floor(Math.random() * 8) + 1);
+    setCaptchaB(Math.floor(Math.random() * 8) + 1);
+    setCaptchaInput("");
+  };
+
   const createMut = useMutation({
     mutationFn: () =>
       createFn({
@@ -79,16 +89,27 @@ function Dashboard() {
           isPublic,
           maxUsers,
           password: roomPassword.trim() || undefined,
+          captchaAnswer: Number(captchaInput),
+          captchaExpected: captchaA + captchaB,
         },
       }),
     onSuccess: (res) => {
       setDialogOpen(false);
       setName("");
       setRoomPassword("");
+      regenCaptcha();
       qc.invalidateQueries({ queryKey: ["rooms"] });
       navigate({ to: "/room/$code", params: { code: res.code } });
     },
-    onError: () => toast.error(t("error_generic")),
+    onError: (e) => {
+      const msg = (e as Error).message || "";
+      if (msg.includes("CAPTCHA_INVALID")) {
+        toast.error(t("captcha_invalid") || "Captcha invalid");
+        regenCaptcha();
+      } else {
+        toast.error(t("error_generic"));
+      }
+    },
   });
 
   // Poll invites
