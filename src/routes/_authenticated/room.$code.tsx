@@ -941,17 +941,38 @@ function RoomPage() {
 
         {/* Chat side */}
         <aside
-          className={`${chatOpen ? "flex" : "hidden lg:flex"} w-full max-w-sm flex-col border-s border-border bg-card lg:w-80 fixed lg:static inset-0 z-40 lg:z-auto`}
+          className={`${chatOpen ? "flex" : "hidden lg:flex"} ${chatCollapsed ? "lg:w-12" : "w-full max-w-sm lg:w-80"} flex-col border-s border-border bg-card fixed lg:static inset-0 z-40 lg:z-auto transition-all`}
         >
           <div className="flex items-center justify-between border-b border-border px-3 py-2">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-primary" />
-              <span className="font-bold text-sm">{t("chat")}</span>
+              {!chatCollapsed && <span className="font-bold text-sm">{t("chat")}</span>}
             </div>
-            <button className="lg:hidden rounded p-1 hover:bg-secondary" onClick={() => setChatOpen(false)} aria-label="close">
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              {!chatCollapsed && (
+                <button
+                  className="rounded p-1 hover:bg-secondary text-muted-foreground"
+                  onClick={() => setChat((c) => c.filter((m) => !m.self))}
+                  title="Clear my messages"
+                  aria-label="clear"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+              <button
+                className="hidden lg:inline-flex rounded p-1 hover:bg-secondary"
+                onClick={() => setChatCollapsed((v) => !v)}
+                aria-label="collapse"
+              >
+                {chatCollapsed ? <ChevronUp className="h-4 w-4 rotate-90" /> : <ChevronDown className="h-4 w-4 rotate-90" />}
+              </button>
+              <button className="lg:hidden rounded p-1 hover:bg-secondary" onClick={() => setChatOpen(false)} aria-label="close">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
+          {!chatCollapsed && (<>
+
           <div ref={chatScrollRef} className="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
             {chat.length > visibleCount && (
               <button
