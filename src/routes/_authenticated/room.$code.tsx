@@ -1126,7 +1126,13 @@ function VideoTile({
       )}
       <div className="absolute top-2 end-2 flex items-center gap-1">
         {ping != null && ping > 0 && (
-          <span className="rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-mono text-white backdrop-blur">
+          <span
+            className={`flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-mono text-white backdrop-blur ${
+              ping < 80 ? "text-success" : ping < 200 ? "text-warning" : "text-destructive"
+            }`}
+            title={`${ping}ms`}
+          >
+            {ping < 400 ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
             {ping}ms
           </span>
         )}
