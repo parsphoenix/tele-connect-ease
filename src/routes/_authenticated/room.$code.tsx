@@ -1084,6 +1084,41 @@ function RoomPage() {
           </div>
         </div>
       )}
+      {/* Password prompt */}
+      <Dialog open={passwordPrompt} onOpenChange={(o) => { if (!o) navigate({ to: "/dashboard" }); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("enter_room_password")}</DialogTitle>
+          </DialogHeader>
+          <Input
+            type="password"
+            value={passwordInput}
+            onChange={(e) => setPasswordInput(e.target.value)}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                pendingPasswordRef.current = passwordInput;
+                setPasswordPrompt(false);
+                setPasswordInput("");
+                setJoinKey((k) => k + 1);
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => navigate({ to: "/dashboard" })}>{t("cancel")}</Button>
+            <Button
+              onClick={() => {
+                pendingPasswordRef.current = passwordInput;
+                setPasswordPrompt(false);
+                setPasswordInput("");
+                setJoinKey((k) => k + 1);
+              }}
+            >
+              {t("apply")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
